@@ -18,6 +18,7 @@
 
 /** ATmega8**/
 #define DDR_SPI		DDRB
+#define SPI_Pull	PORTB
 #define SS			PINB2
 #define MOSI		PINB3
 #define MISO		PINB4
@@ -49,7 +50,7 @@
 *	6			fosc/32
 *	7			fosc/64
 */
-#define SPI_Speed		0
+#define SPI_Speed		1
 
 //SPIE = 0 (Disables SPI interrupt); SPIE = 1 (Enables SPI interrupt)
 #define SPI_interrupt	0
@@ -67,13 +68,23 @@
 *******************************************************************/
 void SPI_init(void);
 
+/*******************************************************************
+* Description : Pulls slave select line to high (1)
+*******************************************************************/
+void SS_high(void);
+
+/*******************************************************************
+* Description : Pulls slave select line to low (0)
+*******************************************************************/
+void SS_low(void);
+
 /****************************************************************************
 * Description : Transmits the data in SPDR register via SPI and reads
 *				received data from SPDR after end of transmission
 *
-* Returns : Received data from SPDR after end of transmission (SPI_Transmit)
+* Returns : Received data from SPDR after end of transmission (SPI_Read_Write)
 ****************************************************************************/
-char SPI_Transmit(unsigned char data);
+unsigned char SPI_Read_Write(unsigned char data);
 
 
 /**************************************************
@@ -81,9 +92,6 @@ char SPI_Transmit(unsigned char data);
 **************************************************/
 
 void SPI_init(){
-	//Enable SPI
-	SPCR |= (1<<SPE);
-	
 	//Master Mode
 	if(Operation_Mode == 1){
 		DDR_SPI |= ((1<<MOSI) | (1<<SCK) | (1<<SS));
@@ -98,18 +106,6 @@ void SPI_init(){
 		SPCR &= ~(1<<MSTR);
 	}
 	
-	//Data Modes
-	if (SPI_Mode == 0) SPCR &= ~((1<<CPOL) | (1<<CPHA));
-	if (SPI_Mode == 1){
-		SPCR &= ~(1<<CPOL);
-		SPCR |= (1<<CPHA);
-	}
-	if (SPI_Mode == 2){
-		SPCR |= (1<<CPOL);
-		SPCR &= ~(1<<CPHA);
-	}
-	if (SPI_Mode == 3) SPCR |= ((1<<CPOL) | (1<<CPHA));
-	
 	//SPI Speed
 	char temp;
 	temp = (0x04 & SPI_Speed);			// masking SPI2X bit
@@ -121,7 +117,19 @@ void SPI_init(){
 	if(temp == 0x01) SPCR |= temp;
 	if(temp == 0x02) SPCR |= temp;
 	if(temp == 0x03) SPCR |= temp;
-	
+		
+	//Data Modes
+	if (SPI_Mode == 0) SPCR &= ~((1<<CPOL) | (1<<CPHA));
+	if (SPI_Mode == 1){
+		SPCR &= ~(1<<CPOL);
+		SPCR |= (1<<CPHA);
+	}
+	if (SPI_Mode == 2){
+		SPCR |= (1<<CPOL);
+		SPCR &= ~(1<<CPHA);
+	}
+	if (SPI_Mode == 3) SPCR |= ((1<<CPOL) | (1<<CPHA));
+		
 	//SPI interrupt
 	if(SPI_interrupt == 0) SPCR &= ~(1<<SPIE);
 	if(SPI_interrupt == 1) SPCR |= (1<<SPIE);
@@ -129,9 +137,20 @@ void SPI_init(){
 	//Data Format
 	if(Data_Format == 0) SPCR &= ~(1<<DORD);
 	if(Data_Format == 1) SPCR |= (1<<DORD);
+	
+	//Enable SPI
+	SPCR |= (1<<SPE);
 }
 
-char SPI_Transmit(unsigned char data){
+void SS_high(){
+	SPI_Pull |= (1<<SS);
+}
+
+void SS_low(){
+	SPI_Pull &= ~(1<<SS);
+}
+
+unsigned char SPI_Read_Write(unsigned char data){
 	//Transmission starts as soon as data is put in SPDR
 	SPDR = data;
 	while(!(SPSR & (1<<SPIF)));
